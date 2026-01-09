@@ -1,12 +1,12 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   good_picoshell.c                                   :+:      :+:    :+:   */
+/*   recreating_good_picoshell.c                        :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: yosherau <yosherau@student.42kl.edu.my>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2025/10/08 18:58:27 by yosherau          #+#    #+#             */
-/*   Updated: 2025/10/08 19:18:58 by yosherau         ###   ########.fr       */
+/*   Created: 2025/10/08 21:47:15 by yosherau          #+#    #+#             */
+/*   Updated: 2025/10/08 23:21:28 by yosherau         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -18,85 +18,68 @@
 
 int	count_commands(char **cmds[])
 {
-	int	count;
+	int	index;
 
-	count = 0;
-	while (cmds[count])
-		count++;
-	return (count);
+	index = 0;
+	while (cmds[index])
+		index++;
+	return (index);
 }
 
-int picoshell(char **cmds[])
+int	picoshell(char **cmds[])
 {
-	int i = 0;
-	int pids[count_commands(cmds)];
-	int prev_fd[2] = {-1, -1};
-	int curr_fd[2];
-	int command_count = count_commands(cmds);
+	int		cmd_count = count_commands(cmds);
+	pid_t	pids[cmd_count];
+	int		curr_fd[2];
+	int		prev_fd[2] = {-1, -1};
+	int		index;
 
-	while (i < command_count)
+	index = -1;
+	while (++index < cmd_count)
 	{
-		if (i < command_count - 1 && pipe(curr_fd) == -1)
+		if (index < cmd_count - 1 && pipe(curr_fd) == -1)
 			exit(EXIT_FAILURE);
-
-		pids[i] = fork();
-		if (pids[i] == -1)
+		pids[index] = fork();
+		if (pids[index] == -1)
 			exit(EXIT_FAILURE);
-
-		if (pids[i] == 0)
+		if (pids[index] == 0)
 		{
-			// If not first command, get input from previous pipe
-			if (i > 0)
+			if (index > 0)
 			{
 				dup2(prev_fd[0], STDIN_FILENO);
 				close(prev_fd[0]);
 				close(prev_fd[1]);
 			}
-
-			// If not last command, output to current pipe
-			if (i < command_count - 1)
+			if (index < cmd_count - 1)
 			{
-				close(curr_fd[0]);
 				dup2(curr_fd[1], STDOUT_FILENO);
+				close(curr_fd[0]);
 				close(curr_fd[1]);
 			}
-
-			execvp(cmds[i][0], cmds[i]);
-			perror("execvp");
-			exit(EXIT_FAILURE);
+			execvp(cmds[index][0], cmds[index]);
 		}
-
-		// Parent closes unused pipe ends
-		if (i > 0)
+		if (index > 0)
 		{
 			close(prev_fd[0]);
 			close(prev_fd[1]);
 		}
-
-		// Move current pipe to previous for next iteration
-		if (i < command_count - 1)
+		if (index < cmd_count - 1)
 		{
 			prev_fd[0] = curr_fd[0];
 			prev_fd[1] = curr_fd[1];
 		}
-		i++;
 	}
-
-	// Close last remaining pipe in parent
-	if (command_count > 1)
+	if (cmd_count > 1)
 	{
 		close(prev_fd[0]);
 		close(prev_fd[1]);
 	}
-
-	// Wait for all children
-	for (i = 0; i < command_count; i++)
-		waitpid(pids[i], NULL, 0);
-
-	return EXIT_SUCCESS;
+	index = -1;
+	while (++index < cmd_count)
+		wait(NULL);
+	return (EXIT_SUCCESS);
 }
 
-// Count how many commands there are (split by "|")
 static int count_pipes(char **argv)
 {
 	int count = 1; // At least one command
